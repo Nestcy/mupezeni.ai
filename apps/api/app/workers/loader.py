@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.workers.customer_revenue.definition import create_customer_revenue_worker
+from app.workers.marketing.definition import create_marketing_worker
 
 
 class WorkerLoader:
@@ -15,3 +16,5 @@ class WorkerLoader:
         """
         # Customer Revenue Worker
         registry.register(create_customer_revenue_worker())
+        # Marketing Worker
+        registry.register(create_marketing_worker())
