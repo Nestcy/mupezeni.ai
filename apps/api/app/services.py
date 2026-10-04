@@ -24,3 +24,9 @@ checkout_service = CheckoutService()
 payment_service = PaymentService()
 fulfillment_service = FulfillmentService()
 delivery_service = DeliveryService()
+
+# AI models (provider-agnostic; configured via LLM_* / IMAGE_* env vars)
+from app.ai import ImageClient, LLMGateway
+
+llm_gateway = LLMGateway.from_settings()
+image_client = ImageClient.from_settings()

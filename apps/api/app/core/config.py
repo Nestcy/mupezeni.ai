@@ -26,6 +26,23 @@ class Settings(BaseSettings):
     meta_webhook_verify_token: str = ""
     meta_graph_version: str = "v21.0"
 
+    # AI models (provider-agnostic). Anything exposing an OpenAI-compatible HTTP API works:
+    # set the base URL, key and model name for whichever provider you choose.
+    llm_provider: str = ""  # free-text label for logs only
+    llm_api_key: str = ""
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_model: str = ""
+    llm_temperature: float = 0.2
+    llm_max_tokens: int = 1000
+    llm_timeout: float = 30.0
+
+    image_provider: str = ""  # free-text label for logs only
+    image_api_key: str = ""
+    image_base_url: str = "https://api.openai.com/v1"
+    image_model: str = ""
+    image_size: str = "1024x1024"
+    image_timeout: float = 120.0
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
