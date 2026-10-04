@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     allow_origins: str = "http://localhost:3000,http://localhost:5173"
 
+    # Onboarding / connectors. Comma-separated Fernet keys; first encrypts, all decrypt (rotation).
+    connector_encryption_keys: str = ""
+    oauth_state_secret: str = ""
+    frontend_url: str = "http://localhost:3000"
+    meta_app_id: str = ""
+    meta_app_secret: str = ""
+    meta_redirect_uri: str = ""
+    meta_webhook_verify_token: str = ""
+    meta_graph_version: str = "v21.0"
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",

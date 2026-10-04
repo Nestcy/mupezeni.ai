@@ -15,7 +15,7 @@ class ProductStatus(str, Enum):
 
 class ProductCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    slug: str = Field(..., min_length=1, max_length=255, regex=r"^[a-z0-9-]+$")
+    slug: str = Field(..., min_length=1, max_length=255, pattern=r"^[a-z0-9-]+$")
     description: Optional[str] = None
     sku: str = Field(..., min_length=1, max_length=100)
     base_price: int = Field(..., ge=0)  # Minor units

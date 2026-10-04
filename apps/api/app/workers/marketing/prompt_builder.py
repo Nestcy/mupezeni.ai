@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from app.marketing.models import (
-    BrandContext,
     CampaignStrategyProfile,
     MarketingContext,
 )
+from app.workers.customer_revenue.contracts import BrandContext
 
 
 class MarketingPromptBuilder:

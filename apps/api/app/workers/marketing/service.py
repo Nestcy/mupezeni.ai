@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from app.agents.contracts import ActorType, WorkerContext
+from app.agents.contracts import WorkerContext
+from app.capabilities.models import ActorType
 from app.marketing.models import (
     ActionRisk,
     MarketingContent,

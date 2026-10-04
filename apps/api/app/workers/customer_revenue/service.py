@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from app.agents.contracts import ActorContext, ActorType, WorkerContext
+from app.agents.contracts import WorkerContext
+from app.capabilities.models import ActorContext, ActorType
 from app.capabilities.runtime import CapabilityRuntime
 from app.workers.customer_revenue.contracts import (
     BrandContext,

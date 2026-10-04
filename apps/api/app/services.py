@@ -4,7 +4,7 @@ Services are composed here and injected where needed.
 """
 from app.analytics.services import BusinessAnalyticsService
 from app.conversations.services import ConversationService
-from app.crm.services import CustomerService
+from app.crm.customers import CustomerManagementService as CustomerService
 from app.marketing.services import CampaignService
 
 # Phase 9 Commerce Completion Services
