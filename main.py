@@ -59,6 +59,10 @@ async def lifespan(_: FastAPI):
         logger.warning("DEV AUTH ENABLED: authentication is bypassed. Never use this outside local development.")
     if not (settings.supabase_url and settings.supabase_anon_key):
         logger.warning("Supabase is not configured: authenticated routes will reject all requests.")
+    if not svc.llm_gateway.configured:
+        logger.warning("LLM not configured: set LLM_API_KEY and LLM_MODEL.")
+    if not svc.image_client.configured:
+        logger.warning("Image model not configured: set IMAGE_API_KEY and IMAGE_MODEL.")
     logger.warning("Commerce services are in-memory and use stub catalog/analytics data.")
     yield
 
