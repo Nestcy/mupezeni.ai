@@ -76,7 +76,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.allow_origins.split(",") if o.strip()],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
 )
 
@@ -123,6 +123,44 @@ async def admin_access(access: dict[str, Any] = Depends(business_access)) -> dic
     if access.get("role") not in {"owner", "admin"}:
         raise HTTPException(status_code=403, detail="Owner or admin role required")
     return access
+
+
+# ── Onboarding & connector auth ───────────────────────────────────────────────
+
+async def _inbound_handler(event) -> None:
+    """TODO: hand off to the conversation/worker pipeline. Business id is already tenant-verified."""
+    logger.info("inbound business=%s channel=%s msg=%s", event.business_id, event.channel, event.external_message_id)
+
+
+def _mount_onboarding() -> None:
+    from app.db.client import get_service_role_client
+    from app.onboarding.crypto import CredentialCipher, CryptoConfigError
+    from app.onboarding.meta import GraphMetaClient
+    from app.onboarding.routes import build_router
+    from app.onboarding.service import OnboardingService
+    from app.onboarding.store import SupabaseStore
+    from app.onboarding.verifiers import HttpCatalogVerifier
+
+    try:
+        if not settings.oauth_state_secret:
+            raise CryptoConfigError("OAUTH_STATE_SECRET is not configured")
+        service = OnboardingService(
+            SupabaseStore(get_service_role_client()),
+            CredentialCipher(settings.connector_encryption_keys),
+            GraphMetaClient(settings.meta_app_id, settings.meta_app_secret, settings.meta_redirect_uri, settings.meta_graph_version),
+            HttpCatalogVerifier(),
+            settings.oauth_state_secret,
+        )
+    except (CryptoConfigError, RuntimeError) as exc:
+        logger.warning("Onboarding routes NOT mounted: %s", exc)  # fail closed: no half-secured connector endpoints
+        return
+    app.include_router(build_router(
+        service=service, current_user=current_user, business_access=business_access, admin_access=admin_access,
+        inbound_handler=_inbound_handler, meta_app_secret=settings.meta_app_secret,
+        meta_verify_token=settings.meta_webhook_verify_token))
+
+
+_mount_onboarding()
 
 
 @contextmanager

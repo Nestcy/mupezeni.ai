@@ -42,4 +42,8 @@ class IncomingMessageEnvelope(BaseModel):
     received_at: str | None = None
 
 
-__all__ = ["MessageAttachment", "DeliveryResult", "OutboundMessageEnvelope", "IncomingMessageEnvelope"]
+# The rest of the package (service, outbound, providers, adapters) uses these shorter names.
+IncomingMessage = IncomingMessageEnvelope
+OutboundMessage = OutboundMessageEnvelope
+
+__all__ = ["IncomingMessage", "OutboundMessage", "MessageAttachment", "DeliveryResult", "OutboundMessageEnvelope", "IncomingMessageEnvelope"]

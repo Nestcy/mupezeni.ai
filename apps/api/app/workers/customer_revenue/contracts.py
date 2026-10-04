@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -32,7 +33,7 @@ class CustomerIntent(str):
     UNKNOWN = "unknown"
 
 
-class CustomerConversationState(str):
+class CustomerConversationState(str, Enum):
     """Lightweight conversation state model"""
 
     BROWSING = "browsing"

@@ -106,3 +106,12 @@ class DeliveryCreationFailed(MupezeniError):
 class DeliveryUnavailable(MupezeniError):
     def __init__(self, reason: str = "Delivery is not available"):
         super().__init__(reason, "DELIVERY_UNAVAILABLE")
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+class UnauthorizedError(MupezeniError):
+    """Webhook/request failed authentication (e.g. bad or missing signature). Maps to HTTP 401."""
+
+    def __init__(self, reason: str = "Unauthorized"):
+        super().__init__(reason, "UNAUTHORIZED", status_code=401)

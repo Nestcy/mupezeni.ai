@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from app.conversations.services import ConversationProcessingService, ConversationContextService, MessageProcessingQueue
-from app.crm.services import CustomerManagementService
+from app.conversations.services import ConversationService, ConversationContextService, MessageProcessingQueue
+from app.crm.customers import CustomerManagementService
 from app.communications.service import CommunicationService
 
 
 def test_phase8_message_pipeline() -> None:
     customer_service = CustomerManagementService()
-    conversation_service = ConversationProcessingService()
+    conversation_service = ConversationService()
     context_service = ConversationContextService()
     queue = MessageProcessingQueue()
     communication = CommunicationService()
