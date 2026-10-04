@@ -1,0 +1,1 @@
+"""Addresses domain package."""
