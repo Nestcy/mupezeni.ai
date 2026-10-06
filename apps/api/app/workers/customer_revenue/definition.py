@@ -145,6 +145,11 @@ Do not attempt these—they will fail and confuse the customer.
             "cart.create",
             "cart.get",
             "cart.add_item",
+            "checkout.create",
+            "payments.create",
+        ],
+        requires_approval_for=[
+            "payments.create",
         ],
         autonomy_level=AutonomyLevel.BOUNDED,
         max_iterations=10,

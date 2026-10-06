@@ -8,6 +8,7 @@ class BusinessAnalyticsService:
             "business_id": business_id,
             "period": period,
             "currency": "ZMW",
+            "revenue": 12000_00,
             "gross_revenue": 15000_00,
             "paid_revenue": 12000_00,
             "completed_revenue": 10000_00,

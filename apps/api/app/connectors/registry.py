@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.connectors.catalog.providers.mupezeni import MupezeniCatalogProvider
+from app.connectors.catalog.providers.shopify import ShopifyCatalogProvider
 from app.connectors.inventory.providers.mupezeni import MupezeniInventoryProvider
 
 
@@ -39,12 +40,14 @@ class ConnectorRegistry:
     def __init__(self, provider_overrides: dict[str, dict[str, Any]] | None = None):
         self.provider_overrides = provider_overrides or {}
 
-    def resolve(self, business_id: str, category: str) -> Any:
+    def register_provider(self, business_id: str, category: str, provider_instance: Any) -> None:
+        if business_id not in self.provider_overrides:
+            self.provider_overrides[business_id] = {}
+        self.provider_overrides[business_id][category] = provider_instance
+
+    def resolve(self, business_id: str, category: str, provider_name: str | None = None) -> Any:
         """
         Resolve a connector provider for a business and capability category.
-
-        For now, all businesses use Mupezeni native providers.
-        Future: will query business_connectors table to support Shopify, etc.
         """
         # Check for test/override providers
         if business_id in self.provider_overrides:
@@ -52,7 +55,10 @@ class ConnectorRegistry:
             if provider:
                 return provider
 
-        # For Phase 3, default to Mupezeni native providers
+        if provider_name == "shopify":
+            return ShopifyCatalogProvider()
+
+        # Default to Mupezeni native providers
         if category == "catalog":
             return MupezeniCatalogProvider(catalog_id="default")
         elif category == "inventory":

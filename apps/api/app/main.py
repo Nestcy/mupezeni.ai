@@ -1,19 +1,22 @@
-"""Mupezeni API entrypoint.
+"""Mupezeni API — canonical entrypoint.
 
-Run (from apps/api):
+Run locally (from apps/api/):
     DEBUG=true MUPEZENI_DEV_AUTH=true uvicorn app.main:app --reload
 
-IMPORTANT: commerce state (checkouts, payments, fulfillments, deliveries) lives in
-process memory today, so run a single worker and expect a restart to wipe it.
+Run on Render (from repo root via main.py re-export):
+    uvicorn main:app --host 0.0.0.0 --port $PORT
 
-Environment (repo-root .env):
-    SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY   real auth
-    ALLOW_ORIGINS                                                comma-separated CORS origins
-    DEBUG=true                                                   enables /docs
-    MUPEZENI_DEV_AUTH=true                                       local-only auth bypass; needs DEBUG=true too.
-                                                                 Identity from X-Dev-User, role from X-Dev-Role.
-    PAYMENT_WEBHOOK_SECRET_<PROVIDER>, DELIVERY_WEBHOOK_SECRET_<PROVIDER>   HMAC-SHA256 secrets, e.g. ..._MOCK
-    PAYMENT_PROVIDER, DELIVERY_PROVIDER                          default "mock"
+Environment (.env at repo root):
+    SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+    ALLOW_ORIGINS                      comma-separated CORS origins
+    DEBUG=true                         enables /docs + verbose logs
+    MUPEZENI_DEV_AUTH=true             local-only auth bypass (needs DEBUG=true)
+    PAYMENT_WEBHOOK_SECRET_<PROVIDER>  HMAC-SHA256 secret e.g. _MOCK
+    PAYMENT_PROVIDER, DELIVERY_PROVIDER   default "mock"
+    SENTRY_DSN                         optional; enables Sentry error tracking
+    IMAGE_PROTOCOL                     "openai" (default) | "gemini"
+    LLM_REASONING_EFFORT               Groq: "none"|"low"|"medium"|"high"
+    LLM_FALLBACK_MODEL                 model name; used on 429/503 from primary
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ import hmac
 import json
 import logging
 import os
+import sys
 import uuid
 from contextlib import asynccontextmanager, contextmanager
 from typing import Any, Literal
@@ -42,6 +46,19 @@ from app.delivery.webhooks import DeliveryWebhookProcessor
 from app.payments.models import PaymentStatus
 from app.payments.webhooks import WebhookProcessor
 
+# ── Structured logging ────────────────────────────────────────────────────────
+_LOG_FMT = (
+    '{"time":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}'
+    if not settings.debug
+    else "%(asctime)s %(levelname)-8s %(name)s  %(message)s"
+)
+logging.basicConfig(
+    stream=sys.stdout,
+    format=_LOG_FMT,
+    level=logging.DEBUG if settings.debug else logging.INFO,
+    force=True,
+)
+
 logger = logging.getLogger("mupezeni.api")
 
 # Two switches on purpose: a stray env var alone must never disable auth in production.
@@ -55,15 +72,35 @@ _delivery_webhooks = DeliveryWebhookProcessor()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # ── Sentry (optional) ─────────────────────────────────────────────────────
+    if settings.sentry_dsn:
+        try:
+            import sentry_sdk  # noqa: PLC0415
+            sentry_sdk.init(dsn=settings.sentry_dsn, traces_sample_rate=0.1)
+            logger.info("Sentry error tracking initialised")
+        except ImportError:
+            logger.warning(
+                "sentry-sdk not installed but SENTRY_DSN is set. "
+                "Add sentry-sdk to requirements.txt to enable error tracking."
+            )
+
     if DEV_AUTH:
-        logger.warning("DEV AUTH ENABLED: authentication is bypassed. Never use this outside local development.")
+        logger.warning(
+            "DEV AUTH ENABLED — authentication is bypassed. "
+            "Never use MUPEZENI_DEV_AUTH outside local development."
+        )
     if not (settings.supabase_url and settings.supabase_anon_key):
-        logger.warning("Supabase is not configured: authenticated routes will reject all requests.")
+        logger.warning("Supabase not configured: authenticated routes will reject all requests.")
     if not svc.llm_gateway.configured:
-        logger.warning("LLM not configured: set LLM_API_KEY and LLM_MODEL.")
+        logger.warning(
+            "LLM not configured: set LLM_API_KEY + LLM_MODEL "
+            "(LLM_BASE_URL for non-OpenAI providers; e.g. https://api.groq.com/openai/v1 for Groq)."
+        )
     if not svc.image_client.configured:
-        logger.warning("Image model not configured: set IMAGE_API_KEY and IMAGE_MODEL.")
-    logger.warning("Commerce services are in-memory and use stub catalog/analytics data.")
+        logger.warning(
+            "Image model not configured: set IMAGE_API_KEY, IMAGE_MODEL, "
+            "and IMAGE_PROTOCOL ('openai' or 'gemini')."
+        )
     yield
 
 
@@ -248,10 +285,28 @@ async def root() -> dict[str, str]:
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
+    """Health check with dependency probes.
+
+    Always returns HTTP 200 so Render's health checker doesn't cycle the
+    service.  Use the ``status`` field to detect degraded state.
+    """
+    db_ok = False
+    if settings.supabase_service_role_key and settings.supabase_url:
+        try:
+            from app.db.client import get_service_role_client  # noqa: PLC0415
+            get_service_role_client().table("businesses").select("id").limit(1).execute()
+            db_ok = True
+        except Exception:  # pragma: no cover
+            pass
+
+    all_ok = db_ok or not settings.supabase_url  # unconfigured Supabase is expected in dev
     return {
-        "status": "ok",
+        "status": "ok" if all_ok else "degraded",
         "version": settings.app_version,
+        "db": db_ok,
         "supabase_configured": bool(settings.supabase_url and settings.supabase_anon_key),
+        "llm_configured": svc.llm_gateway.configured,
+        "image_configured": svc.image_client.configured,
         "dev_auth": DEV_AUTH,
     }
 

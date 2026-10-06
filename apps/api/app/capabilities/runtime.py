@@ -26,6 +26,7 @@ from app.capabilities.models import (
     CapabilityResultStatus,
 )
 from app.capabilities.registry import get_capability
+from app.core.config import settings
 from app.db.client import get_service_role_client
 from app.db.repositories import OrderRepository, CartRepository
 
@@ -35,8 +36,11 @@ logger = logging.getLogger("mupezeni.runtime")
 class CapabilityRuntime:
     """Core runtime for executing capabilities safely"""
 
-    def __init__(self):
-        self.db = get_service_role_client()
+    def __init__(self, db: Any = None, connector_registry: Any = None):
+        self.db = db if db is not None else (
+            get_service_role_client() if settings.supabase_service_role_key else None
+        )
+        self.connector_registry = connector_registry
 
     async def execute(
         self,
@@ -118,12 +122,14 @@ class CapabilityRuntime:
             # Step 8: Execute through connector
             from app.connectors.registry import ConnectorRegistry
 
-            registry = ConnectorRegistry()
+            registry = self.connector_registry or ConnectorRegistry()
             provider_instance = registry.resolve(
-                request.business_id, capability_def.category
+                request.business_id,
+                capability_def.category,
+                provider_name=connector.get("provider"),
             )
             if not provider_instance:
-                raise ProviderUnavailable("unknown")
+                raise ProviderUnavailable(connector.get("provider", "unknown"))
 
             try:
                 result = await provider_instance.execute(

@@ -160,3 +160,28 @@ def get_capability(name: str) -> CapabilityDefinition | None:
 def list_capabilities() -> list[CapabilityDefinition]:
     """List all available capabilities"""
     return list(CAPABILITIES.values())
+
+
+class CapabilityRegistry:
+    """Registry for managing and querying capabilities."""
+
+    def __init__(self) -> None:
+        self._capabilities: dict[str, CapabilityDefinition] = dict(CAPABILITIES)
+
+    def register(self, capability: CapabilityDefinition) -> None:
+        key = capability.name.value if hasattr(capability.name, "value") else str(capability.name)
+        self._capabilities[key] = capability
+
+    def get(self, name: str) -> CapabilityDefinition | None:
+        return self._capabilities.get(name)
+
+    def list(self) -> list[CapabilityDefinition]:
+        return list(self._capabilities.values())
+
+
+__all__ = [
+    "CAPABILITIES",
+    "get_capability",
+    "list_capabilities",
+    "CapabilityRegistry",
+]

@@ -32,6 +32,10 @@ class CapabilityName(str, Enum):
     ORDER_GET = "order.get"
     ORDER_CANCEL = "order.cancel"
 
+    # Checkout & payment capabilities
+    CHECKOUT_CREATE = "checkout.create"
+    PAYMENTS_CREATE = "payments.create"
+
 
 class RiskLevel(str, Enum):
     """Risk classification for capabilities"""
@@ -75,10 +79,10 @@ class ActorContext(BaseModel):
 class CapabilityDefinition(BaseModel):
     """Definition of a capability: what it does, its contract, and risk"""
 
-    name: CapabilityName
+    name: CapabilityName | str
     description: str
     category: str  # catalog, inventory, cart, order, etc
-    risk_level: RiskLevel
+    risk_level: RiskLevel | str
     requires_approval: bool = False
     input_schema: Optional[dict[str, Any]] = None  # JSON schema
     output_schema: Optional[dict[str, Any]] = None  # JSON schema

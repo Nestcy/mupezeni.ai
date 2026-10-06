@@ -24,6 +24,7 @@ class WorkerDefinition(BaseModel):
     version: str = "1.0"
     instructions: str
     capabilities: list[str] = Field(default_factory=list)
+    requires_approval_for: list[str] = Field(default_factory=list)
     autonomy_level: AutonomyLevel = AutonomyLevel.BOUNDED
     max_iterations: int = 10
     max_tool_calls: int = 20
