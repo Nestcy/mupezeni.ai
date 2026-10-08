@@ -6,10 +6,26 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+from app.db.repositories.conversations import (
+    ConversationRepository,
+    InMemoryConversationRepository,
+)
+from app.db.repositories.messages import (
+    InMemoryMessageRepository,
+    MessageRepository,
+)
+
+
 class ConversationService:
     """Manage conversation lifecycle and state."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        repo: ConversationRepository | None = None,
+        message_repo: MessageRepository | None = None,
+    ) -> None:
+        self.repo = repo or InMemoryConversationRepository()
+        self.message_repo = message_repo or InMemoryMessageRepository()
         self._conversations: dict[str, dict[str, Any]] = {}
         self._messages: dict[str, list[dict[str, Any]]] = {}
 
@@ -27,6 +43,21 @@ class ConversationService:
         }
         self._conversations[conversation_id] = item
         self._messages[conversation_id] = []
+
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(
+                    self.repo.create(
+                        business_id=business_id,
+                        customer_id=customer_id,
+                        channel=channel,
+                    )
+                )
+        except Exception:
+            pass
+
         return item
 
     def get(self, conversation_id: str) -> dict[str, Any] | None:
@@ -38,6 +69,25 @@ class ConversationService:
         if convo:
             convo["updated_at"] = datetime.utcnow().isoformat()
             convo["last_message_at"] = datetime.utcnow().isoformat()
+
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(
+                    self.message_repo.create(
+                        conversation_id=conversation_id,
+                        business_id=convo["business_id"] if convo else "",
+                        content=message.get("content", ""),
+                        sender_type=message.get("sender_type", "customer"),
+                        sender_id=message.get("sender_id"),
+                        direction=message.get("direction", "inbound"),
+                        metadata=message.get("metadata"),
+                    )
+                )
+        except Exception:
+            pass
+
         return message
 
     def get_messages(self, conversation_id: str) -> list[dict[str, Any]]:

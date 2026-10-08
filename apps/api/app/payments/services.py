@@ -11,13 +11,24 @@ from app.payments.providers.mock import MockPaymentProvider
 from app.core.commerce_errors import PaymentFailed, PaymentAlreadyProcessed
 
 
+from app.db.repositories.payments import (
+    InMemoryPaymentRepository,
+    PaymentRepositoryProtocol,
+)
+
+
 class PaymentService:
     """
     Payment domain service managing payment records, provider integrations,
     idempotency, and status updates.
     """
 
-    def __init__(self, idempotency_store: Optional[IdempotencyStore] = None) -> None:
+    def __init__(
+        self,
+        idempotency_store: Optional[IdempotencyStore] = None,
+        repo: PaymentRepositoryProtocol | None = None,
+    ) -> None:
+        self.repo = repo or InMemoryPaymentRepository()
         self._payments: Dict[str, Payment] = {}
         self._provider_map: Dict[str, Payment] = {}  # "provider:provider_payment_id" -> Payment
         self.mock_provider = MockPaymentProvider()
@@ -79,6 +90,29 @@ class PaymentService:
         if idempotency_key:
             self.idempotency_store.save_key(business_id, idempotency_key, payment_id)
 
+        # Persist to repository
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(
+                    self.repo.create(
+                        business_id=business_id,
+                        order_id=order_id,
+                        checkout_id=checkout_id,
+                        customer_id=customer_id,
+                        amount_minor=amount_minor,
+                        currency=currency,
+                        provider=provider,
+                        payment_method_type=payment_method_type,
+                        idempotency_key=idempotency_key,
+                        provider_payment_id=payment.provider_payment_id,
+                        status=payment.status.value,
+                    )
+                )
+        except Exception:
+            pass
+
         self._emit_event(business_id, "payment.created", {"payment_id": payment_id, "order_id": order_id})
         return payment
 
@@ -104,6 +138,14 @@ class PaymentService:
 
         payment.status = new_status
         payment.updated_at = datetime.utcnow()
+
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.repo.update_status(payment.id, new_status.value, payment.business_id))
+        except Exception:
+            pass
 
         event_name = f"payment.{new_status.value}"
         self._emit_event(payment.business_id, event_name, {"payment_id": payment.id, "order_id": payment.order_id})

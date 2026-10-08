@@ -12,12 +12,19 @@ from app.checkout.validation import validate_checkout_cart
 from app.core.commerce_errors import CheckoutAlreadyCompleted, CheckoutExpired, CartNotFound
 
 
+from app.db.repositories.checkouts import (
+    CheckoutRepositoryProtocol,
+    InMemoryCheckoutRepository,
+)
+
+
 class CheckoutService:
     """
     Checkout domain service for managing checkout sessions and state.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, repo: CheckoutRepositoryProtocol | None = None) -> None:
+        self.repo = repo or InMemoryCheckoutRepository()
         self._sessions: Dict[str, CheckoutSession] = {}
         self._idempotency_map: Dict[str, str] = {}  # idempotency_key -> checkout_id
         # Stub inventory and products for server-side validation
@@ -115,6 +122,30 @@ class CheckoutService:
             self.inventory_db[pid] = self.inventory_db.get(pid, 0) - qty
             self.reserved_inventory[pid] = self.reserved_inventory.get(pid, 0) + qty
 
+        # Persist to repository
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(
+                    self.repo.create(
+                        business_id=business_id,
+                        customer_id=customer_id,
+                        cart_id=cart_id,
+                        currency=currency,
+                        subtotal_minor=totals["subtotal_minor"],
+                        shipping_minor=totals["shipping_minor"],
+                        tax_minor=totals["tax_minor"],
+                        fee_minor=totals["fee_minor"],
+                        grand_total_minor=totals["grand_total_minor"],
+                        line_items=[i.model_dump() for i in line_items],
+                        idempotency_key=idempotency_key,
+                        expires_at=expires_at.isoformat() if expires_at else None,
+                    )
+                )
+        except Exception:
+            pass
+
         return session
 
     def validate_checkout(self, business_id: str, checkout_id: str) -> CheckoutSession:
@@ -151,6 +182,16 @@ class CheckoutService:
         session.status = transition(session.status, CheckoutStatus.COMPLETED)
         session.order_id = order_id
         session.updated_at = datetime.utcnow()
+
+        # Persist completion
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.repo.complete(checkout_id, order_id, business_id))
+        except Exception:
+            pass
+
         return session
 
     def cancel_or_expire(self, business_id: str, checkout_id: str, is_expired: bool = False) -> CheckoutSession:
@@ -161,6 +202,12 @@ class CheckoutService:
         session.status = transition(session.status, next_st)
         session.updated_at = datetime.utcnow()
 
-        # Release reserved inventory (§16 Inventory effect: Payment fails or checkout expires -> reserved inventory released)
-        # We release the reserved quantities back to available inventory
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.repo.update_status(checkout_id, next_st.value, business_id))
+        except Exception:
+            pass
+
         return session

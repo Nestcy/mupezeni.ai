@@ -58,10 +58,13 @@ class ConnectorRegistry:
         if provider_name == "shopify":
             return ShopifyCatalogProvider()
 
-        # Default to Mupezeni native providers
+        # Default to Mupezeni native providers (tenant-scoped to business_id)
         if category == "catalog":
-            return MupezeniCatalogProvider(catalog_id="default")
+            return MupezeniCatalogProvider(catalog_id=business_id)
         elif category == "inventory":
             return MupezeniInventoryProvider()
+        elif category in ("cart", "order"):
+            from app.connectors.cart.provider import NativeCartAndOrderProvider
+            return NativeCartAndOrderProvider()
         else:
             return None
